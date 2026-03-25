@@ -1,0 +1,196 @@
+<?xml version="1.0" ?>
+<sdf version="1.8">
+  <world name="yolo_world">
+
+    <plugin filename="gz-sim-physics-system"        name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-user-commands-system"  name="gz::sim::systems::UserCommands"/>
+    <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"/>
+    <plugin filename="gz-sim-sensors-system"        name="gz::sim::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+    <plugin filename="gz-sim-imu-system"            name="gz::sim::systems::Imu"/>
+
+    <model name="ground_plane">
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry><plane><normal>0 0 1</normal><size>20 20</size></plane></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><plane><normal>0 0 1</normal><size>20 20</size></plane></geometry>
+          <material><ambient>0.8 0.8 0.8 1</ambient><diffuse>0.8 0.8 0.8 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="wall_top">
+      <static>true</static><pose>0 5 1 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>10 0.2 2</size></box></geometry></collision>
+        <visual name="vis"><geometry><box><size>10 0.2 2</size></box></geometry>
+          <material><ambient>0.5 0.5 0.9 1</ambient><diffuse>0.5 0.5 0.9 1</diffuse></material></visual>
+      </link>
+    </model>
+
+    <model name="wall_bottom">
+      <static>true</static><pose>0 -5 1 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>10 0.2 2</size></box></geometry></collision>
+        <visual name="vis"><geometry><box><size>10 0.2 2</size></box></geometry>
+          <material><ambient>0.5 0.5 0.9 1</ambient><diffuse>0.5 0.5 0.9 1</diffuse></material></visual>
+      </link>
+    </model>
+
+    <model name="wall_left">
+      <static>true</static><pose>-5 0 1 0 0 1.5708</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>10 0.2 2</size></box></geometry></collision>
+        <visual name="vis"><geometry><box><size>10 0.2 2</size></box></geometry>
+          <material><ambient>0.5 0.5 0.9 1</ambient><diffuse>0.5 0.5 0.9 1</diffuse></material></visual>
+      </link>
+    </model>
+
+    <model name="wall_right">
+      <static>true</static><pose>5 0 1 0 0 1.5708</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>10 0.2 2</size></box></geometry></collision>
+        <visual name="vis"><geometry><box><size>10 0.2 2</size></box></geometry>
+          <material><ambient>0.5 0.5 0.9 1</ambient><diffuse>0.5 0.5 0.9 1</diffuse></material></visual>
+      </link>
+    </model>
+
+    <include>
+      <name>chair_1</name>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Office Chair</uri>
+      <pose>-2 2 0 0 0 0</pose>
+    </include>
+    <include>
+      <name>chair_2</name>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Office Chair</uri>
+      <pose>2 2 0 0 0 0</pose>
+    </include>
+    <include>
+      <name>chair_3</name>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Office Chair</uri>
+      <pose>-2 -2 0 0 0 0</pose>
+    </include>
+    <include>
+      <name>chair_4</name>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Office Chair</uri>
+      <pose>2 -2 0 0 0 0</pose>
+    </include>
+
+    <light name="sun" type="directional">
+      <pose>0 0 10 0 0 0</pose>
+      <diffuse>0.9 0.9 0.9 1</diffuse>
+      <specular>0.2 0.2 0.2 1</specular>
+      <direction>-0.5 0.1 -0.9</direction>
+      <cast_shadows>true</cast_shadows>
+    </light>
+    <light name="light_fill" type="point">
+      <pose>0 0 4 0 0 0</pose>
+      <diffuse>0.5 0.5 0.5 1</diffuse>
+      <attenuation><range>20</range><constant>0.5</constant><linear>0.01</linear><quadratic>0.001</quadratic></attenuation>
+    </light>
+
+    <!-- TurtleBot3 Waffle with camera -->
+    <model name="waffle">
+      <pose>0 0 0.01 0 0 0</pose>
+
+      <link name="base_footprint"/>
+
+      <joint name="base_joint" type="fixed">
+        <parent>base_footprint</parent>
+        <child>base_link</child>
+        <pose>0 0 0.010 0 0 0</pose>
+      </joint>
+
+      <link name="base_link">
+        <inertial>
+          <mass>1.3729096</mass>
+          <inertia><ixx>8.7002e-3</ixx><ixy>-4.24e-5</ixy><ixz>1.4546e-5</ixz>
+                   <iyy>1.0940e-2</iyy><iyz>-2.834e-7</iyz><izz>1.2836e-2</izz></inertia>
+        </inertial>
+        <collision name="base_collision">
+          <pose>-0.064 0 0.047 0 0 0</pose>
+          <geometry><box><size>0.266 0.266 0.094</size></box></geometry>
+        </collision>
+        <visual name="base_visual">
+          <pose>-0.064 0 0 0 0 0</pose>
+          <geometry><box><size>0.266 0.266 0.094</size></box></geometry>
+          <material><ambient>0.0 0.0 0.8 1</ambient><diffuse>0.0 0.0 0.8 1</diffuse></material>
+        </visual>
+      </link>
+
+      <joint name="wheel_left_joint" type="revolute">
+        <parent>base_link</parent><child>wheel_left_link</child>
+        <pose>0 0.144 0.023 -1.5707963 0 0</pose>
+        <axis><xyz>0 0 1</xyz><limit><lower>-1e16</lower><upper>1e16</upper></limit></axis>
+      </joint>
+      <link name="wheel_left_link">
+        <pose>0 0.144 0.023 -1.5707963 0 0</pose>
+        <inertial><mass>0.1</mass><inertia><ixx>1.1175e-5</ixx><ixy>0</ixy><ixz>0</ixz><iyy>1.1175e-5</iyy><iyz>0</iyz><izz>2.0250e-5</izz></inertia></inertial>
+        <collision name="col"><geometry><cylinder><radius>0.033</radius><length>0.018</length></cylinder></geometry></collision>
+        <visual name="vis"><geometry><cylinder><radius>0.033</radius><length>0.018</length></cylinder></geometry>
+          <material><ambient>0.1 0.1 0.1 1</ambient><diffuse>0.1 0.1 0.1 1</diffuse></material></visual>
+      </link>
+
+      <joint name="wheel_right_joint" type="revolute">
+        <parent>base_link</parent><child>wheel_right_link</child>
+        <pose>0 -0.144 0.023 -1.5707963 0 0</pose>
+        <axis><xyz>0 0 1</xyz><limit><lower>-1e16</lower><upper>1e16</upper></limit></axis>
+      </joint>
+      <link name="wheel_right_link">
+        <pose>0 -0.144 0.023 -1.5707963 0 0</pose>
+        <inertial><mass>0.1</mass><inertia><ixx>1.1175e-5</ixx><ixy>0</ixy><ixz>0</ixz><iyy>1.1175e-5</iyy><iyz>0</iyz><izz>2.0250e-5</izz></inertia></inertial>
+        <collision name="col"><geometry><cylinder><radius>0.033</radius><length>0.018</length></cylinder></geometry></collision>
+        <visual name="vis"><geometry><cylinder><radius>0.033</radius><length>0.018</length></cylinder></geometry>
+          <material><ambient>0.1 0.1 0.1 1</ambient><diffuse>0.1 0.1 0.1 1</diffuse></material></visual>
+      </link>
+
+      <joint name="caster_front_joint" type="ball">
+        <parent>base_link</parent><child>caster_front_link</child>
+      </joint>
+      <link name="caster_front_link">
+        <pose>0.177 0 0.023 0 0 0</pose>
+        <inertial><mass>0.001</mass><inertia><ixx>1e-9</ixx><ixy>0</ixy><ixz>0</ixz><iyy>1e-9</iyy><iyz>0</iyz><izz>1e-9</izz></inertia></inertial>
+        <collision name="col"><geometry><sphere><radius>0.005</radius></sphere></geometry>
+          <surface><friction><ode><mu>0</mu><mu2>0</mu2></ode></friction></surface></collision>
+      </link>
+
+      <joint name="camera_joint" type="fixed">
+        <parent>base_link</parent><child>camera_link</child>
+        <pose>0.064 -0.065 0.094 0 0 0</pose>
+      </joint>
+      <link name="camera_link">
+        <pose>0.064 -0.065 0.094 0 0 0</pose>
+        <inertial><mass>0.001</mass><inertia><ixx>1e-9</ixx><ixy>0</ixy><ixz>0</ixz><iyy>1e-9</iyy><iyz>0</iyz><izz>1e-9</izz></inertia></inertial>
+        <sensor name="camera" type="camera">
+          <always_on>1</always_on>
+          <update_rate>15</update_rate>
+          <camera>
+            <horizontal_fov>1.3962634</horizontal_fov>
+            <image><width>640</width><height>480</height><format>R8G8B8</format></image>
+            <clip><near>0.02</near><far>300</far></clip>
+          </camera>
+          <topic>/camera</topic>
+        </sensor>
+      </link>
+
+      <plugin filename="gz-sim-diff-drive-system" name="gz::sim::systems::DiffDrive">
+        <left_joint>wheel_left_joint</left_joint>
+        <right_joint>wheel_right_joint</right_joint>
+        <wheel_separation>0.287</wheel_separation>
+        <wheel_radius>0.033</wheel_radius>
+        <max_linear_velocity>0.26</max_linear_velocity>
+        <max_angular_velocity>1.82</max_angular_velocity>
+        <topic>/model/waffle/cmd_vel</topic>
+        <odom_topic>/model/waffle/odometry</odom_topic>
+        <frame_id>odom</frame_id>
+        <child_frame_id>base_footprint</child_frame_id>
+      </plugin>
+
+    </model>
+
+  </world>
+</sdf>
