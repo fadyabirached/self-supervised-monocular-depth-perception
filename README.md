@@ -33,7 +33,6 @@ The depth branch is based on a self-supervised monocular depth pipeline.
 - turn left or right when an obstacle is close
 - avoid walls and chairs using estimated scene depth
   
-![WhatsApp Image 2026-03-25 at 5 04 33 PM](https://github.com/user-attachments/assets/5956dee9-022a-4264-bb40-3c2970590099)
 ---
 
 ### 2. YOLO 
