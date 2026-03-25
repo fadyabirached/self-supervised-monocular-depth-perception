@@ -10,6 +10,7 @@ This project compares two perception approaches for robot obstacle avoidance in 
 A TurtleBot3 Waffle robot moves in a custom Gazebo environment containing walls and chairs.  
 The goal is to evaluate how each perception method affects robot navigation and obstacle avoidance behavior.
 
+![WhatsApp Image 2026-03-25 at 5 11 52 PM (1)](https://github.com/user-attachments/assets/915f2279-97b2-4213-bc0f-ae87a5d19605)
 ---
 
 ## Project Logic
@@ -37,7 +38,7 @@ The depth branch is based on a self-supervised monocular depth pipeline.
 - move forward when center is clear
 - turn left or right when an obstacle is close
 - avoid walls and chairs using estimated scene depth
-
+![WhatsApp Image 2026-03-25 at 5 04 33 PM](https://github.com/user-attachments/assets/5956dee9-022a-4264-bb40-3c2970590099)
 ---
 
 ### 2. YOLO Branch
@@ -55,7 +56,7 @@ The YOLO branch uses object detection for obstacle-related navigation.
 
 #### Limitation
 YOLO provides object class and image position, but not direct distance estimation.
-
+![WhatsApp Image 2026-03-25 at 5 15 14 PM](https://github.com/user-attachments/assets/6b97259e-94b9-4ef1-bbc4-bf1c6fb0cbaf)
 ---
 
 ## Environment
