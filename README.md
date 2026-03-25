@@ -38,6 +38,7 @@ The depth branch is based on a self-supervised monocular depth pipeline.
 - move forward when center is clear
 - turn left or right when an obstacle is close
 - avoid walls and chairs using estimated scene depth
+  
 ![WhatsApp Image 2026-03-25 at 5 04 33 PM](https://github.com/user-attachments/assets/5956dee9-022a-4264-bb40-3c2970590099)
 ---
 
@@ -56,6 +57,7 @@ The YOLO branch uses object detection for obstacle-related navigation.
 
 #### Limitation
 YOLO provides object class and image position, but not direct distance estimation.
+
 ![WhatsApp Image 2026-03-25 at 5 15 14 PM](https://github.com/user-attachments/assets/6b97259e-94b9-4ef1-bbc4-bf1c6fb0cbaf)
 ---
 
