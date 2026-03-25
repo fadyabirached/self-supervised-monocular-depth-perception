@@ -2,13 +2,7 @@
 
 ## Project Overview
 
-This project compares two perception approaches for robot obstacle avoidance in ROS 2 simulation:
-
-- **YOLO-based object detection**
-- **Self-supervised monocular depth estimation**
-
-A TurtleBot3 Waffle robot moves in a custom Gazebo environment containing walls and chairs.  
-The goal is to evaluate how each perception method affects robot navigation and obstacle avoidance behavior.
+This project compares two perception approaches for robot obstacle avoidance in a ROS 2 simulation environment: YOLO-based object detection and self-supervised monocular depth estimation. A TurtleBot3 Waffle robot navigates in a custom Gazebo world containing walls and chairs. The objective is to evaluate how each perception method influences navigation performance and obstacle avoidance behavior.
 
 ![WhatsApp Image 2026-03-25 at 5 11 52 PM (1)](https://github.com/user-attachments/assets/915f2279-97b2-4213-bc0f-ae87a5d19605)
 ---
@@ -59,6 +53,8 @@ The YOLO branch uses object detection for obstacle-related navigation.
 YOLO provides object class and image position, but not direct distance estimation.
 
 ![WhatsApp Image 2026-03-25 at 5 15 14 PM](https://github.com/user-attachments/assets/6b97259e-94b9-4ef1-bbc4-bf1c6fb0cbaf)
+YOLO does not always correctly label the simulated chair because it was trained on the COCO dataset rather than on Gazebo-specific objects, so it assigns the closest known class based on visual similarity.
+
 ---
 
 ## Environment
