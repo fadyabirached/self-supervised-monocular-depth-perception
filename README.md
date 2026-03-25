@@ -53,6 +53,7 @@ The YOLO branch uses object detection for obstacle-related navigation.
 YOLO provides object class and image position, but not direct distance estimation.
 
 ![WhatsApp Image 2026-03-25 at 5 15 14 PM](https://github.com/user-attachments/assets/6b97259e-94b9-4ef1-bbc4-bf1c6fb0cbaf)
+
 YOLO does not always correctly label the simulated chair because it was trained on the COCO dataset rather than on Gazebo-specific objects, so it assigns the closest known class based on visual similarity.
 
 ---
