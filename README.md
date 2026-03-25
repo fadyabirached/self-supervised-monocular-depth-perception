@@ -68,3 +68,15 @@ The project uses a custom Gazebo world containing:
 World file:
 ```bash
 src/my_yolo_world/worlds/yolo_world.sdf
+```
+## Running the Project
+
+The two perception branches were executed independently using separate scripts in order to evaluate the self-supervised depth pipeline and the YOLO-based detection pipeline under the same simulation conditions.
+
+### Run the self-supervised depth branch
+```bash
+~/run_depth.sh
+```
+```bash
+~/run_yolo.sh
+```
