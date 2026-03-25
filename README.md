@@ -27,7 +27,7 @@ The depth branch is based on a self-supervised monocular depth pipeline.
   - optional contrastive consistency
 
 #### Inference logic
-- The trained depth model predicts a depth map from the camera image.
+- The depth model predicts a depth map from the camera image.
 - The depth map is divided into regions:
   - left
   - center
@@ -42,7 +42,7 @@ The depth branch is based on a self-supervised monocular depth pipeline.
 ![WhatsApp Image 2026-03-25 at 5 04 33 PM](https://github.com/user-attachments/assets/5956dee9-022a-4264-bb40-3c2970590099)
 ---
 
-### 2. YOLO Branch
+### 2. YOLO 
 The YOLO branch uses object detection for obstacle-related navigation.
 
 #### Detection logic
