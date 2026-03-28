@@ -9,8 +9,8 @@ This project compares two perception approaches for robot obstacle avoidance in 
 
 ## Project Logic
 
-### 1. Self-Supervised Depth Branch
-The depth branch is based on a self-supervised monocular depth pipeline.
+### 1. Self-Supervised Depth
+The depth is based on a self-supervised monocular depth pipeline.
 
 #### Training logic
 - RGB image sequences are collected from the robot camera in simulation.
@@ -33,10 +33,11 @@ The depth branch is based on a self-supervised monocular depth pipeline.
 - turn left or right when an obstacle is close
 - avoid walls and chairs using estimated scene depth
   
+
 ---
 
 ### 2. YOLO 
-The YOLO branch uses object detection for obstacle-related navigation.
+YOLO uses object detection for obstacle-related navigation.
 
 #### Detection logic
 - The camera image is processed by YOLO.
