@@ -33,6 +33,7 @@ The depth is based on a self-supervised monocular depth pipeline.
 - turn left or right when an obstacle is close
 - avoid walls and chairs using estimated scene depth
   
+<img width="1282" height="577" alt="image" src="https://github.com/user-attachments/assets/ce856f42-c146-44b3-9b2b-3438efe3cec0" />
 
 ---
 
