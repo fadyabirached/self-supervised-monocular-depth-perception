@@ -9,6 +9,7 @@ from sensor_msgs.msg import Image
 from std_msgs.msg import Float32
 from depth_project.models.depth_net import DepthNet
 from depth_project.losses import disp_to_depth
+from depth_project.steering_logic import split_regions, percentile_of_valid, median_filter, choose_steering
 
 
 class DepthNode(Node):
@@ -45,16 +46,6 @@ class DepthNode(Node):
             img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
         return img
 
-    def med(self, buf, val):
-        buf.append(val)
-        if len(buf) > self._N:
-            buf.pop(0)
-        return float(np.median(buf))
-
-    def pct(self, arr, q):
-        v = arr[np.isfinite(arr) & (arr > 0)]
-        return float(np.percentile(v, q)) if len(v) > 0 else 0.0
-
     def image_callback(self, msg):
         frame = self.to_bgr(msg)
         img = self.transform(frame).unsqueeze(0).to(self.device)
@@ -66,24 +57,13 @@ class DepthNode(Node):
         depth_vis = cv2.normalize(depth, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
         depth_vis = cv2.applyColorMap(depth_vis, cv2.COLORMAP_MAGMA)
 
-        h, w = depth.shape
-        y1 = int(h * 0.25)
-        y2 = int(h * 0.60)
-        roi = depth[y1:y2, :]
-        W = roi.shape[1]
+        L_roi, C_roi, R_roi = split_regions(depth)
 
-        L_roi = roi[:, :int(W * 0.33)]
-        C_roi = roi[:, int(W * 0.33):int(W * 0.67)]
-        R_roi = roi[:, int(W * 0.67):]
+        L = median_filter(self._L, percentile_of_valid(L_roi, 35), self._N)
+        C = median_filter(self._C, percentile_of_valid(C_roi, 30), self._N)
+        R = median_filter(self._R, percentile_of_valid(R_roi, 35), self._N)
 
-        L = self.med(self._L, self.pct(L_roi.flatten(), 35))
-        C = self.med(self._C, self.pct(C_roi.flatten(), 30))
-        R = self.med(self._R, self.pct(R_roi.flatten(), 35))
-
-        if C < min(L, R) * 0.85:
-            steering = 0.0
-        else:
-            steering = -0.8 if R < L else 0.8
+        steering = choose_steering(L, C, R)
 
         out = Float32()
         out.data = float(np.clip(steering, -1.0, 1.0))

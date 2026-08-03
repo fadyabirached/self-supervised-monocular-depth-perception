@@ -1,9 +1,10 @@
-import math
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import TwistStamped
 from std_msgs.msg import Bool
 from sensor_msgs.msg import LaserScan
+
+from depth_project.scan_utils import min_valid_range
 
 
 class AutoGridCollect(Node):
@@ -53,12 +54,6 @@ class AutoGridCollect(Node):
         msg.data = True
         self.cap_pub.publish(msg)
 
-    def min_valid(self, arr):
-        vals = [x for x in arr if math.isfinite(x) and x > 0.0]
-        if not vals:
-            return 999.0
-        return min(vals)
-
     def scan_cb(self, msg: LaserScan):
         n = len(msg.ranges)
         if n == 0:
@@ -77,9 +72,9 @@ class AutoGridCollect(Node):
         right_end = int(n * 0.80)
         right = msg.ranges[right_start:right_end]
 
-        self.front_min = self.min_valid(front)
-        self.left_min = self.min_valid(left)
-        self.right_min = self.min_valid(right)
+        self.front_min = min_valid_range(front)
+        self.left_min = min_valid_range(left)
+        self.right_min = min_valid_range(right)
         self.scan_ready = True
 
     def loop(self):

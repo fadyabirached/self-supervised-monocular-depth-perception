@@ -48,7 +48,6 @@ class YoloVisualizer(Node):
 
             for box in r.boxes:
                 x1, y1, x2, y2 = map(int, box.xyxy[0])
-                conf = float(box.conf[0])
                 cls = int(box.cls[0])
                 name = self.model.names[cls]
 

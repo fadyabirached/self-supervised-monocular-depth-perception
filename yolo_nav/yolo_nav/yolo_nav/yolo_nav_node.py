@@ -6,6 +6,8 @@ from cv_bridge import CvBridge
 from ultralytics import YOLO
 import cv2
 
+from yolo_nav.steering_logic import best_detection, choose_steering_and_speed
+
 
 class YoloNavigator(Node):
     def __init__(self):
@@ -37,8 +39,7 @@ class YoloNavigator(Node):
         image_center_x = w / 2.0
         results = self.model(frame, verbose=False)
 
-        best_target = None
-        best_area   = 0.0
+        candidates = []
         vis = frame.copy()
 
         cv2.line(vis, (int(w * 0.4), 0), (int(w * 0.4), h), (255, 255, 0), 1)
@@ -62,46 +63,41 @@ class YoloNavigator(Node):
                 cv2.putText(vis, f'{class_name} {conf:.2f}', (x1, y1 - 8),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
                 cv2.circle(vis, (int(center_x), (y1 + y2) // 2), 5, (0, 0, 255), -1)
-                if area > best_area:
-                    best_area   = area
-                    best_target = {'center_x': center_x, 'area': area}
+                candidates.append({'center_x': center_x, 'area': area})
+
+        best_target = best_detection(candidates)
+        steer_val, speed_val, status = choose_steering_and_speed(
+            best_target, image_center_x,
+            close_area=self.close_area, center_threshold=self.center_threshold)
 
         steering = Float32()
         speed    = Float32()
+        steering.data = steer_val
+        speed.data    = speed_val
 
-        if best_target is None:
+        offset = None if best_target is None else best_target['center_x'] - image_center_x
+        area   = None if best_target is None else best_target['area']
+
+        if status == 'SEARCHING':
             self.get_logger().info('[NAV] No chair — spinning to search')
-            steering.data = 0.5
-            speed.data    = 0.0
-            status_text   = 'SEARCHING...'
-            status_color  = (0, 165, 255)
-        else:
-            offset = best_target['center_x'] - image_center_x
-            area   = best_target['area']
-            if area > self.close_area:
-                steering.data = 0.8
-                speed.data    = 0.0
-                status_text   = 'TOO CLOSE — TURNING'
-                status_color  = (0, 0, 255)
-                self.get_logger().info('[NAV] Too close — turning')
-            elif offset < -self.center_threshold:
-                steering.data = -0.6
-                speed.data    = 0.10
-                status_text   = f'TURN LEFT  offset={offset:.0f}'
-                status_color  = (255, 100, 0)
-                self.get_logger().info(f'[NAV] Chair LEFT offset={offset:.0f}')
-            elif offset > self.center_threshold:
-                steering.data = 0.6
-                speed.data    = 0.10
-                status_text   = f'TURN RIGHT  offset={offset:.0f}'
-                status_color  = (255, 100, 0)
-                self.get_logger().info(f'[NAV] Chair RIGHT offset={offset:.0f}')
-            else:
-                steering.data = 0.0
-                speed.data    = 0.15
-                status_text   = f'FORWARD  area={area:.0f}'
-                status_color  = (0, 255, 0)
-                self.get_logger().info(f'[NAV] Centered — forward  area={area:.0f}')
+            status_text  = 'SEARCHING...'
+            status_color = (0, 165, 255)
+        elif status == 'TOO_CLOSE':
+            self.get_logger().info('[NAV] Too close — turning')
+            status_text  = 'TOO CLOSE — TURNING'
+            status_color = (0, 0, 255)
+        elif status == 'TURN_LEFT':
+            self.get_logger().info(f'[NAV] Chair LEFT offset={offset:.0f}')
+            status_text  = f'TURN LEFT  offset={offset:.0f}'
+            status_color = (255, 100, 0)
+        elif status == 'TURN_RIGHT':
+            self.get_logger().info(f'[NAV] Chair RIGHT offset={offset:.0f}')
+            status_text  = f'TURN RIGHT  offset={offset:.0f}'
+            status_color = (255, 100, 0)
+        else:  # FORWARD
+            self.get_logger().info(f'[NAV] Centered — forward  area={area:.0f}')
+            status_text  = f'FORWARD  area={area:.0f}'
+            status_color = (0, 255, 0)
 
         self.steering_pub.publish(steering)
         self.speed_pub.publish(speed)
