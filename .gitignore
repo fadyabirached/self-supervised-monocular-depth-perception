@@ -1,0 +1,13 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Test / lint caches
+.pytest_cache/
+.ruff_cache/
+
+# ROS 2 colcon build artifacts (if this repo is ever built in place)
+build/
+install/
+log/
