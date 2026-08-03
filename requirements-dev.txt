@@ -1,0 +1,6 @@
+# Dev-only dependencies for running the unit tests and linter locally
+# (mirrors .github/workflows/ci.yml). The pure-logic tests under tests/
+# only need numpy + pytest, not the full requirements.txt.
+numpy>=1.24
+pytest>=7.0
+ruff>=0.4

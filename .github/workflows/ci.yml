@@ -1,0 +1,38 @@
+name: CI
+
+# This is a ROS 2 / Gazebo workspace, which is too heavy to install in
+# GitHub Actions. This workflow instead lints all Python source with ruff
+# and runs the unit tests for the pure-Python decision-logic modules
+# (depth_project.steering_logic, depth_project.scan_utils,
+# yolo_nav.steering_logic) that don't require ROS 2, OpenCV, PyTorch, or
+# a running simulation.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dev dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Lint with ruff
+        run: ruff check --line-length=120 .
+
+      - name: Compile-check all Python files
+        run: |
+          find . -name '*.py' -not -path './.git/*' -print0 \
+            | xargs -0 -n1 python -m py_compile
+
+      - name: Run unit tests
+        run: pytest tests/ -v
