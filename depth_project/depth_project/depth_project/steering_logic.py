@@ -69,17 +69,28 @@ def choose_steering(left_depth: float, center_depth: float, right_depth: float,
                      center_margin: float = 0.85, turn_gain: float = 0.8) -> float:
     """Choose a steering command from three smoothed region depths.
 
-    This is a direct extraction of the conditional used in
-    ``DepthNode.image_callback`` (unchanged behavior):
+    Depth values are metres to the nearest obstacle in that region
+    (see ``losses.disp_to_depth``): smaller means nearer/more blocked,
+    larger means farther/more open. Go straight while the center reads
+    at least as open as the more cautious of the two sides; once it
+    reads clearly nearer than both (scaled by ``center_margin``), turn
+    toward whichever side has more room.
 
-        if center_depth < min(left_depth, right_depth) * center_margin:
-            steering = 0.0
-        else:
-            steering = -turn_gain if right_depth < left_depth else turn_gain
+    This was previously inverted on both axes: it drove straight at
+    whatever was directly ahead, and turned toward whichever side had
+    the *nearer* obstacle rather than away from it. Two things gave it
+    away. First, the module and README both describe the opposite of
+    what the old comparisons did ("go straight unless the center is
+    clearly closer... otherwise turn toward whichever side reads more
+    open" is not what `if center < ... : return 0.0` implements).
+    Second, driving the real simulation reproduced it exactly: the
+    robot rammed columns it was facing head-on, and idled in the open
+    turning left forever because an all-clear reading also used to
+    satisfy the (inverted) turn condition.
 
     Returns a steering value of either ``0.0``, ``turn_gain`` or
     ``-turn_gain``.
     """
-    if center_depth < min(left_depth, right_depth) * center_margin:
+    if center_depth >= min(left_depth, right_depth) * center_margin:
         return 0.0
-    return -turn_gain if right_depth < left_depth else turn_gain
+    return turn_gain if left_depth >= right_depth else -turn_gain

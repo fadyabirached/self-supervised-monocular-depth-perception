@@ -288,6 +288,12 @@ Nothing about this looks broken from the outside. The node starts, the depth map
 
 `depth_node.py` now decodes to RGB for the model and converts to BGR only for the OpenCV window. Preprocessing lives in exactly one place (`infer_image.preprocess`), which both the node and the offline script call, so the two paths cannot disagree again, and `tests/test_depth_inference.py` fails if the channel order is ever swapped back.
 
+### An inverted steering condition that made the robot drive into obstacles
+
+Running the simulation in a container surfaced a second bug, one the code had been carrying since before the RGB/BGR one and that no amount of eyeballing the source would have caught: `choose_steering` was backwards on both of the decisions it makes. Depth values are metres to the nearest obstacle, so smaller means nearer. The old comparison drove *straight* whenever the center reading was clearly nearer than the sides (`if center_depth < min(left, right) * margin: steering = 0.0`), and when it did turn, it turned toward whichever side was *more* blocked rather than away from it. Both are the opposite of what the module's own docstring and this README's [Project logic](#project-logic) section describe.
+
+Nothing about reading the code flagged it; the mistake reads as a plausible obstacle-avoidance rule at a glance. It only became obvious once the robot was actually driving in the recovered simulation: it rammed columns it was facing head-on, and idled in open space turning left indefinitely, because an all-clear reading also happened to satisfy the (inverted) turn condition. Fixed in `steering_logic.choose_steering`, the one place both `depth_node.py` and `infer_image.py` get their decision from. `tests/test_depth_steering_logic.py` now asserts the direction as well as the fact of turning, not just that *some* value comes back, since the old tests passed with the bug present.
+
 ---
 
 ## Tests and CI

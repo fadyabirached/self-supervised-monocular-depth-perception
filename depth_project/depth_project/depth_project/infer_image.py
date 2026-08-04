@@ -153,7 +153,7 @@ def side_by_side(image: Image.Image, depth: np.ndarray) -> Image.Image:
 def describe(steering: float) -> str:
     """The steering value in the words the README uses for it."""
     if steering == 0.0:
-        return "go straight (center is clearly the closest region)"
+        return "go straight (center reads at least as open as the sides)"
     return "turn left" if steering > 0 else "turn right"
 
 

@@ -73,28 +73,46 @@ class TestMedianFilter:
 
 
 class TestChooseSteering:
-    def test_goes_straight_when_center_is_closer_than_sides(self):
-        # center well below min(left, right) * 0.85 margin
-        assert choose_steering(left_depth=5.0, center_depth=1.0, right_depth=5.0) == 0.0
+    def test_turns_when_obstacle_is_directly_ahead(self):
+        # center well below min(left, right) * 0.85 margin: something is
+        # close dead ahead, so this must NOT be 0.0 (straight into it).
+        steering = choose_steering(left_depth=5.0, center_depth=1.0, right_depth=5.0)
+        assert steering != 0.0
 
-    def test_turns_right_when_right_more_open_side_is_smaller(self):
-        # not straight (center is not below the margin), and right < left
-        steering = choose_steering(left_depth=5.0, center_depth=5.0, right_depth=2.0)
-        assert steering == -0.8
+    def test_goes_straight_in_a_wide_open_room(self):
+        # nothing closer ahead than to either side: no reason to turn.
+        assert choose_steering(3.0, 3.0, 3.0) == 0.0
 
-    def test_turns_left_when_left_is_smaller_or_equal(self):
-        steering = choose_steering(left_depth=2.0, center_depth=5.0, right_depth=5.0)
+    def test_goes_straight_when_center_reads_more_open_than_the_sides(self):
+        # center is farther away than both sides: clearly not blocked.
+        assert choose_steering(left_depth=2.0, center_depth=5.0, right_depth=2.0) == 0.0
+
+    def test_turns_toward_the_more_open_left_side(self):
+        # center blocked, and left has more room (larger depth) than right:
+        # turn toward the open side (left), not into the near one (right).
+        steering = choose_steering(left_depth=5.0, center_depth=1.0, right_depth=2.0)
         assert steering == 0.8
 
-    def test_custom_gain_and_margin(self):
+    def test_turns_toward_the_more_open_right_side(self):
+        steering = choose_steering(left_depth=2.0, center_depth=1.0, right_depth=5.0)
+        assert steering == -0.8
+
+    def test_custom_margin_can_keep_it_straight(self):
+        # center (5.0) is not below min(5.0, 1.0) * 0.5 = 0.5, so a looser
+        # margin reads this as open enough despite the near right side.
         steering = choose_steering(
             left_depth=5.0, center_depth=5.0, right_depth=1.0,
             center_margin=0.5, turn_gain=1.0,
         )
-        assert steering == -1.0
+        assert steering == 0.0
 
-    def test_equal_depths_turn_left_by_default_tiebreak(self):
-        # center is not below the margin (3.0 < 3.0 * 0.85 is False), and
-        # right is not strictly less than left, so the "turn left" branch
-        # of the tie-break is taken.
-        assert choose_steering(3.0, 3.0, 3.0) == 0.8
+    def test_custom_gain_applies_once_a_turn_is_warranted(self):
+        steering = choose_steering(
+            left_depth=5.0, center_depth=0.1, right_depth=1.0,
+            center_margin=0.5, turn_gain=1.0,
+        )
+        assert steering == 1.0
+
+    def test_equal_side_depths_default_to_left_on_tiebreak(self):
+        steering = choose_steering(left_depth=3.0, center_depth=0.5, right_depth=3.0)
+        assert steering == 0.8
