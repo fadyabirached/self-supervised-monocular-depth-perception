@@ -1,6 +1,15 @@
 # Dev-only dependencies for running the unit tests and linter locally
-# (mirrors .github/workflows/ci.yml). The pure-logic tests under tests/
-# only need numpy + pytest, not the full requirements.txt.
+# (mirrors .github/workflows/ci.yml). Deliberately much lighter than
+# requirements.txt: none of these tests need ROS 2, OpenCV, ultralytics or
+# a GPU.
+#
+# torch is not listed here because the PyPI wheel bundles the CUDA runtime
+# (~2.5 GB of nvidia-* packages). Install the CPU build separately if you
+# want the checkpoint tests in tests/test_depth_inference.py to run rather
+# than skip, which is what CI does:
+#
+#   pip install --index-url https://download.pytorch.org/whl/cpu torch
 numpy>=1.24
+Pillow>=10.0
 pytest>=7.0
 ruff>=0.4

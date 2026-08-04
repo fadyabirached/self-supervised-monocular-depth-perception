@@ -80,6 +80,7 @@ depth_project/depth_project/      # self-supervised depth branch
 ├── depth_project/
 │   ├── models/                   # DepthNet, PoseNet
 │   ├── depth_node.py             # inference + steering (ROS node)
+│   ├── infer_image.py            # same inference on one saved image: CPU, no ROS (tested)
 │   ├── steering_logic.py         # pure-Python region-split / steering math (tested)
 │   ├── scan_utils.py             # pure-Python LaserScan helper (tested)
 │   ├── robot_controller.py       # /steering_cmd -> /model/waffle/cmd_vel
@@ -104,7 +105,7 @@ yolo_nav/yolo_nav/                # YOLO branch nodes
     ├── yolo_visual_node.py       # detection-only visualizer (no steering logic)
     └── steering_logic.py         # pure-Python detection / steering math (tested)
 
-tests/                            # pytest unit tests for the pure logic above
+tests/                            # pytest unit tests: pure logic above + the trained checkpoint
 scripts/                          # setup + run scripts (see below)
 .github/workflows/ci.yml          # lint + unit tests
 ```
@@ -181,6 +182,23 @@ There is no single launch file for this branch, the script composes three pieces
 2. `ros2 run depth_project robot_controller`, converts `/steering_cmd` into `/model/waffle/cmd_vel`.
 3. `ros2 run yolo_nav yolo_nav_node`, runs YOLOv8n on `/camera` and publishes `/steering_cmd` (downloads `yolov8n.pt` on first run).
 
+### 4. Run the depth model on a single image, without ROS 2 or Gazebo
+
+Everything above needs a machine that can render the simulation. `infer_image.py` is the same inference path with the ROS parts removed, so the trained model can be run on any saved camera frame, on CPU, with only `torch`, `numpy` and `Pillow` installed:
+
+```bash
+pip install --index-url https://download.pytorch.org/whl/cpu torch   # ~200 MB, no CUDA
+pip install numpy Pillow
+
+python depth_project/depth_project/depth_project/infer_image.py frame.png --out side_by_side.png
+```
+
+It prints the range of the predicted depth map, the three region depths in metres, and the steering value with the behaviour it corresponds to (`0.0` straight, `+0.8` left, `-0.8` right). `--out` writes the RGB frame next to its magma-coloured depth map, the same pair `depth_node`'s window shows.
+
+Those region depths and that steering value are what `depth_node` would have published for the frame: both come from `steering_logic.py`, imported unchanged, so the offline path cannot drift from what the robot does. The only difference is that a still image has no history for the six-frame median filter to smooth over.
+
+The frame has to come from the world the model was trained in, see [Known limitations](#known-limitations).
+
 ### To retrain the depth model
 
 ```bash
@@ -201,6 +219,14 @@ No quantitative benchmark run (timed trials, collision counts, success-rate tabl
 
 **Stated limitation / future work:** rerun both branches for a fixed number of trials with `metrics_logger.py` enabled and commit the resulting CSV + a comparison table (success rate, mean reaction time, collision rate) instead of this qualitative summary.
 
+### A train/serve mismatch that was silently degrading the depth branch
+
+Being able to run the model outside the simulator turned up a bug the live pipeline had been hiding. `DepthNet` is trained on RGB: `SequenceDataset` opens frames with `Image.open(...).convert('RGB')`. `depth_node.py` converted every incoming `/camera` message to **BGR** (for OpenCV's display window) and then fed *that* to the model, so at inference the network was reading the red channel as blue and vice versa, on inputs whose channel statistics it had never been trained on.
+
+Nothing about this looks broken from the outside. The node starts, the depth map still has structure, and the robot still drives. The cost only shows up when you can score the same frame both ways: on coloured frames the two orderings disagree by roughly **half the mean predicted depth**, and that is more than enough to flip the published steering command from "turn left" to "turn right".
+
+`depth_node.py` now decodes to RGB for the model and converts to BGR only for the OpenCV window. Preprocessing lives in exactly one place (`infer_image.preprocess`), which both the node and the offline script call, so the two paths cannot disagree again, and `tests/test_depth_inference.py` fails if the channel order is ever swapped back.
+
 ---
 
 ## Tests and CI
@@ -211,6 +237,8 @@ Robotics/ROS 2 code that's tightly coupled to `rclpy` nodes, a live Gazebo simul
 - `depth_project/depth_project/depth_project/scan_utils.py`, LaserScan min-valid-range helper (used by `auto_grid_collect.py`).
 - `yolo_nav/yolo_nav/yolo_nav/steering_logic.py`, best-detection selection and the offset/area-based steering decision (used by `yolo_nav_node.py`).
 
+On top of that, `tests/test_depth_inference.py` exercises the **trained model**, not just the logic around it. The architecture lives in one file and the weights in a 14 MB binary, and until `infer_image.py` existed nothing checked that the two still fit together. It loads the committed checkpoint, runs a real forward pass on CPU and asserts the output is the right shape, finite, inside `disp_to_depth`'s clamp range, deterministic, and not the flat sheet an unloaded network produces. It also pins the RGB channel order described in [Observations](#a-trainserve-mismatch-that-was-silently-degrading-the-depth-branch).
+
 Run them locally:
 
 ```bash
@@ -218,13 +246,21 @@ pip install -r requirements-dev.txt
 pytest tests/ -v
 ```
 
-`.github/workflows/ci.yml` runs on every push/PR to `main`: `ruff` over the whole repo, a `py_compile` pass over every `.py` file, and the `pytest` suite above. It deliberately does **not** try to install ROS 2/Gazebo in CI, that's too heavy for GitHub Actions and would test the CI environment more than the code.
+The checkpoint tests skip unless `torch` is installed, since the PyPI wheel drags in ~2.5 GB of CUDA packages for a machine that may not have a GPU. To run them, add the CPU build:
+
+```bash
+pip install --index-url https://download.pytorch.org/whl/cpu torch
+```
+
+`.github/workflows/ci.yml` runs on every push/PR to `main`: `ruff` over the Python this project wrote (not the ament-generated boilerplate, which has its own linters), a `py_compile` pass over every `.py` file, and the full `pytest` suite with CPU torch installed so the checkpoint tests actually execute. It deliberately does **not** try to install ROS 2/Gazebo in CI, that's too heavy for GitHub Actions and would test the CI environment more than the code.
 
 ---
 
 ## Known limitations
 
 - **No committed quantitative results**, see [Observations](#observations) above.
+- **The depth model only means anything inside the world it was trained in.** It is self-supervised on frames from one Gazebo world, with no labels and no external scale reference, so it has learned the geometry of *that* scene rather than depth in general. Fed ordinary photographs, every left/center/right region comes back between 0.10 m and 0.28 m against a `disp_to_depth` range of 0.1 to 20 m: it reports that everything is pressed against the lens, and the steering command that falls out of comparing three near-identical numbers is decided by noise. This is why there is no public "upload any image" demo, it would look like it worked while being meaningless. `infer_image.py` is for frames captured from `columns_world.world`.
+- **The committed checkpoint is from epoch 1.** `train_selfsup_depth.py` is written to run three epochs and overwrites `checkpoints/selfsup_depth_latest.pth` after each one, and the `epoch` field inside the committed file reads `1`. So the shipped weights are one pass over the collected frames at `lr=1e-4`, not a converged model. That is consistent with how coarse the predicted depths are, and retraining to completion is the first thing to do before quoting any numbers from this branch.
 - **Hardcoded absolute workspace paths**: `my_yolo_world/launch/tb3_custom_world.launch.py` and `depth_project/depth_project/depth_node.py` hardcode paths under `~/ros2_ws/src/...` rather than resolving them via `get_package_share_directory`/parameters. `scripts/setup_workspace.sh` and `scripts/run_*.sh` work around this by symlinking into that exact location.
 - **`depth_project/launch/custom_world_waffle.launch.py`** duplicates `my_yolo_world/launch/tb3_custom_world.launch.py` (same hardcoded world path, `ExecuteProcess`-based instead of `IncludeLaunchDescription`-based). It isn't used by either run script and looks like an earlier iteration left in place; kept for history rather than deleted.
 - **`depth_project/depth_project/yolo_controller.py`** imports a `yolo_msgs` package that isn't declared as a dependency anywhere and isn't registered as a console script in `setup.py`, it's dead/experimental code, not part of either working pipeline.

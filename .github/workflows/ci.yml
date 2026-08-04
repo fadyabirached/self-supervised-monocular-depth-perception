@@ -1,11 +1,16 @@
 name: CI
 
 # This is a ROS 2 / Gazebo workspace, which is too heavy to install in
-# GitHub Actions. This workflow instead lints all Python source with ruff
-# and runs the unit tests for the pure-Python decision-logic modules
-# (depth_project.steering_logic, depth_project.scan_utils,
-# yolo_nav.steering_logic) that don't require ROS 2, OpenCV, PyTorch, or
-# a running simulation.
+# GitHub Actions. This workflow instead lints the Python source this
+# project owns and runs the unit tests that need neither ROS 2, OpenCV nor
+# a running simulation:
+#
+#   - the pure-Python decision logic (depth_project.steering_logic,
+#     depth_project.scan_utils, yolo_nav.steering_logic);
+#   - the trained model itself. The CPU-only torch wheel is light enough to
+#     install here, so tests/test_depth_inference.py loads the committed
+#     checkpoint and runs a real forward pass. Nothing else would catch
+#     DepthNet and its saved weights drifting apart.
 
 on:
   push:
@@ -26,6 +31,13 @@ jobs:
       - name: Install dev dependencies
         run: pip install -r requirements-dev.txt
 
+      - name: Install CPU-only PyTorch
+        # From the CPU index, not PyPI: the default wheel bundles the CUDA
+        # runtime and pulls ~2.5 GB of nvidia-* packages for a runner that
+        # has no GPU. This one is a few hundred MB and runs the checkpoint
+        # in well under a second per frame.
+        run: pip install --index-url https://download.pytorch.org/whl/cpu torch
+
       - name: Lint with ruff
         # Scoped to the pure-Python logic this project actually owns/wrote.
         # The rest of the tree is ROS 2/ament-generated boilerplate (launch
@@ -37,6 +49,7 @@ jobs:
           ruff check --line-length=120 \
             depth_project/depth_project/depth_project/steering_logic.py \
             depth_project/depth_project/depth_project/scan_utils.py \
+            depth_project/depth_project/depth_project/infer_image.py \
             yolo_nav/yolo_nav/yolo_nav/steering_logic.py \
             tests/
 
