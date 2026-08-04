@@ -1,6 +1,6 @@
 """Unit tests for yolo_nav.steering_logic (YOLO chair-navigation branch).
 
-Pure-Python logic only — no ROS 2, OpenCV, cv_bridge, or ultralytics required.
+Pure-Python logic only, no ROS 2, OpenCV, cv_bridge, or ultralytics required.
 """
 
 from yolo_nav.steering_logic import best_detection, choose_steering_and_speed
@@ -53,12 +53,12 @@ class TestChooseSteeringAndSpeed:
         # offset == center_threshold (40.0) should NOT trigger a turn
         # (original code uses strict > / <)
         det = {'center_x': 360.0, 'area': 500.0}
-        steer, speed, status = choose_steering_and_speed(det, image_center_x=320.0)
+        _steer, _speed, status = choose_steering_and_speed(det, image_center_x=320.0)
         assert status == 'FORWARD'
 
     def test_custom_thresholds(self):
         det = {'center_x': 350.0, 'area': 100.0}
-        steer, speed, status = choose_steering_and_speed(
+        _steer, _speed, status = choose_steering_and_speed(
             det, image_center_x=320.0, close_area=50.0, center_threshold=10.0,
         )
         # area (100) > close_area (50) -> TOO_CLOSE takes priority

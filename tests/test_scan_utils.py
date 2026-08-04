@@ -1,6 +1,6 @@
 """Unit tests for depth_project.scan_utils (auto_grid_collect LaserScan helper).
 
-Pure-Python logic only — no ROS 2 required.
+Pure-Python logic only, no ROS 2 required.
 """
 
 import math

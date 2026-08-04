@@ -26,7 +26,7 @@ class YoloNavigator(Node):
         self.target_classes   = {'chair'}
         self.close_area       = 15000.0
         self.center_threshold = 40.0
-        self.get_logger().info('YOLO navigator ready — subscribing to /camera')
+        self.get_logger().info('YOLO navigator ready, subscribing to /camera')
 
     def image_callback(self, msg):
         try:
@@ -79,12 +79,12 @@ class YoloNavigator(Node):
         area   = None if best_target is None else best_target['area']
 
         if status == 'SEARCHING':
-            self.get_logger().info('[NAV] No chair — spinning to search')
+            self.get_logger().info('[NAV] No chair, spinning to search')
             status_text  = 'SEARCHING...'
             status_color = (0, 165, 255)
         elif status == 'TOO_CLOSE':
-            self.get_logger().info('[NAV] Too close — turning')
-            status_text  = 'TOO CLOSE — TURNING'
+            self.get_logger().info('[NAV] Too close, turning')
+            status_text  = 'TOO CLOSE, TURNING'
             status_color = (0, 0, 255)
         elif status == 'TURN_LEFT':
             self.get_logger().info(f'[NAV] Chair LEFT offset={offset:.0f}')
@@ -95,7 +95,7 @@ class YoloNavigator(Node):
             status_text  = f'TURN RIGHT  offset={offset:.0f}'
             status_color = (255, 100, 0)
         else:  # FORWARD
-            self.get_logger().info(f'[NAV] Centered — forward  area={area:.0f}')
+            self.get_logger().info(f'[NAV] Centered, forward  area={area:.0f}')
             status_text  = f'FORWARD  area={area:.0f}'
             status_color = (0, 255, 0)
 
@@ -109,7 +109,7 @@ class YoloNavigator(Node):
         cv2.putText(vis,
                     f'speed={speed.data:.2f}  steer={steering.data:.2f}',
                     (10, h - 12), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (200, 200, 200), 1)
-        cv2.imshow('Robot Vision — YOLO Chair Detection', vis)
+        cv2.imshow('Robot Vision, YOLO Chair Detection', vis)
         cv2.waitKey(1)
 
 

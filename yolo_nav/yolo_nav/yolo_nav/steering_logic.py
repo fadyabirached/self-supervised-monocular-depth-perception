@@ -1,14 +1,13 @@
 """Pure-Python YOLO-detection steering logic for the YOLO navigation branch.
 
-No dependency on ROS 2 (rclpy), OpenCV, ``cv_bridge``, or ``ultralytics`` —
-only plain Python — so it can be unit tested without a running ROS 2 /
+No dependency on ROS 2 (rclpy), OpenCV, ``cv_bridge``, or ``ultralytics``, only plain Python, so it can be unit tested without a running ROS 2 /
 Gazebo environment or a YOLO model checkpoint. It is imported by
 ``yolo_nav_node.py`` at runtime.
 """
 
 from __future__ import annotations
 
-from typing import Optional, TypedDict
+from typing import TypedDict
 
 
 class Detection(TypedDict):
@@ -16,7 +15,7 @@ class Detection(TypedDict):
     area: float
 
 
-def best_detection(detections) -> Optional[Detection]:
+def best_detection(detections) -> Detection | None:
     """Return the detection with the largest bounding-box area, or ``None``.
 
     ``detections`` is an iterable of dicts with ``center_x`` and ``area``
@@ -34,7 +33,7 @@ def best_detection(detections) -> Optional[Detection]:
 
 
 def choose_steering_and_speed(
-    detection: Optional[Detection],
+    detection: Detection | None,
     image_center_x: float,
     close_area: float = 15000.0,
     center_threshold: float = 40.0,

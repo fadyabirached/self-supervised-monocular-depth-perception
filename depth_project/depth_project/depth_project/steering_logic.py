@@ -29,7 +29,7 @@ def split_regions(depth_map, y1_frac: float = 0.25, y2_frac: float = 0.60,
         (left, center, right) sub-arrays.
     """
     depth_map = np.asarray(depth_map)
-    h, w = depth_map.shape
+    h, _w = depth_map.shape
     y1 = int(h * y1_frac)
     y2 = int(h * y2_frac)
     roi = depth_map[y1:y2, :]

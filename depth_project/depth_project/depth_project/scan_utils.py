@@ -1,6 +1,6 @@
 """Pure-Python LaserScan helpers used by auto_grid_collect.py.
 
-No ROS 2 dependency — only needs the standard library ``math`` module — so
+No ROS 2 dependency, only needs the standard library ``math`` module, so
 it can be unit tested without a running ROS 2 / Gazebo environment.
 """
 

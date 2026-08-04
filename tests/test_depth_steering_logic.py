@@ -1,11 +1,10 @@
 """Unit tests for depth_project.steering_logic (self-supervised depth branch).
 
-Pure-Python / NumPy logic only — no ROS 2, OpenCV, or PyTorch required.
+Pure-Python / NumPy logic only, no ROS 2, OpenCV, or PyTorch required.
 """
 
 import numpy as np
 import pytest
-
 from depth_project.steering_logic import (
     choose_steering,
     median_filter,
