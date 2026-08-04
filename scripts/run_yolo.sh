@@ -33,10 +33,10 @@ set -euo pipefail
 ROS_DISTRO="${ROS_DISTRO:-jazzy}"
 ROS2_WS="${ROS2_WS:-$HOME/ros2_ws}"
 
-# shellcheck disable=SC1090
-source "/opt/ros/${ROS_DISTRO}/setup.bash"
-# shellcheck disable=SC1090
-source "${ROS2_WS}/install/setup.bash"
+# shellcheck disable=SC1091
+source "$(dirname "${BASH_SOURCE[0]}")/ros_env.sh"
+require_workspace "${ROS2_WS}"
+source_ros "${ROS_DISTRO}" "${ROS2_WS}"
 
 pids=()
 cleanup() {

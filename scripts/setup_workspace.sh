@@ -24,8 +24,9 @@ ROS2_WS="${ROS2_WS:-$HOME/ros2_ws}"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 echo "Sourcing ROS 2 ${ROS_DISTRO}..."
-# shellcheck disable=SC1090
-source "/opt/ros/${ROS_DISTRO}/setup.bash"
+# shellcheck disable=SC1091
+source "$(dirname "${BASH_SOURCE[0]}")/ros_env.sh"
+source_ros "${ROS_DISTRO}" "${ROS2_WS}"
 
 mkdir -p "${ROS2_WS}/src"
 
