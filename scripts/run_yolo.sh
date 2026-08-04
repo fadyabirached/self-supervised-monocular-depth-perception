@@ -8,7 +8,7 @@
 #
 # Unlike the depth branch, this is composed of two separate launches:
 #   1. my_yolo_world/launch/tb3_custom_world.launch.py
-#        gz sim + robot_state_publisher + robot spawn + cmd_vel/image bridges
+#        gz sim (world carries the robot itself) + cmd_vel/image bridges
 #   2. depth_project's robot_controller + yolo_nav's yolo_nav_node
 #        (run as plain nodes, started once the world above is up)
 #
@@ -19,19 +19,18 @@
 #   - pip install -r requirements.txt (includes ultralytics for YOLOv8n,
 #     which is downloaded automatically on first run)
 #
-# Known limitation: my_yolo_world/launch/tb3_custom_world.launch.py
-# hardcodes the world file path to ~/ros2_ws/src/my_yolo_world/worlds/
-# yolo_world.sdf, so this script (and setup_workspace.sh) assume the
-# default ~/ros2_ws workspace layout.
-#
 # Env vars:
-#   ROS_DISTRO   ROS 2 distro to source (default: jazzy)
-#   ROS2_WS      Colcon workspace to source (default: ~/ros2_ws)
+#   ROS_DISTRO      ROS 2 distro to source (default: jazzy)
+#   ROS2_WS         Colcon workspace to source (default: ~/ros2_ws)
+#   HEADLESS        true to run without the Gazebo GUI (default: false)
+#   RENDER_ENGINE   ogre2 (default) or ogre (try this on a machine with no GPU)
 
 set -euo pipefail
 
 ROS_DISTRO="${ROS_DISTRO:-jazzy}"
 ROS2_WS="${ROS2_WS:-$HOME/ros2_ws}"
+HEADLESS="${HEADLESS:-false}"
+RENDER_ENGINE="${RENDER_ENGINE:-ogre2}"
 
 # shellcheck disable=SC1091
 source "$(dirname "${BASH_SOURCE[0]}")/ros_env.sh"
@@ -48,13 +47,15 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 echo "Starting Gazebo (yolo_world) + bridges..."
-ros2 launch my_yolo_world tb3_custom_world.launch.py &
+ros2 launch my_yolo_world tb3_custom_world.launch.py \
+    headless:="${HEADLESS}" \
+    render_engine:="${RENDER_ENGINE}" &
 pids+=($!)
 
-# tb3_custom_world.launch.py stages up to ~12s of TimerActions itself
-# (world -> robot_state_publisher -> spawn -> bridges); give it margin
-# before starting the perception/control nodes.
-sleep 15
+# tb3_custom_world.launch.py stages its own bridges up to ~6s in; give it
+# margin plus a little more for the world itself to finish loading before
+# starting the perception/control nodes.
+sleep 10
 
 echo "Starting robot_controller (steering_cmd -> cmd_vel)..."
 ros2 run depth_project robot_controller &

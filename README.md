@@ -91,7 +91,7 @@ depth_project/depth_project/      # self-supervised depth branch
 │   ├── collect_selfsup.py / auto_collect.py / auto_grid_collect.py  # data collection
 │   ├── keyboard_control.py / keyboard_steering.py                  # manual teleop
 │   ├── save_images.py            # YOLO training-data capture
-│   └── tools/metrics_logger.py   # optional run-by-run CSV metrics logger
+│   └── tools/metrics_logger.py   # keyboard-driven per-encounter CSV logger
 ├── checkpoints/selfsup_depth_latest.pth
 ├── launch/gazebo.launch.py           # original launch (classic Gazebo, EOL)
 ├── launch/columns_world.launch.py    # current launch (gz sim / Harmonic)
@@ -109,7 +109,7 @@ yolo_nav/yolo_nav/                # YOLO branch nodes
     └── steering_logic.py         # pure-Python detection / steering math (tested)
 
 tests/                            # pytest unit tests: pure logic above + the trained checkpoint
-scripts/                          # setup, run and screen-recording scripts (see below)
+scripts/                          # setup, run, recording and metrics scripts (see below)
 .devcontainer/                    # ROS 2 + Gazebo container with a browser desktop
 .github/workflows/ci.yml          # lint + unit tests
 ```
@@ -213,6 +213,8 @@ There is no single launch file for this branch, the script composes three pieces
 2. `ros2 run depth_project robot_controller`, converts `/steering_cmd` into `/model/waffle/cmd_vel`.
 3. `ros2 run yolo_nav yolo_nav_node`, runs YOLOv8n on `/camera` and publishes `/steering_cmd` (downloads `yolov8n.pt` on first run).
 
+Two bugs in that launch file meant piece 1 could never actually have worked, found while wiring up the container in [Run it in a browser](#run-it-in-a-browser-with-no-local-install): the world path was hardcoded to `/home/mhamad/ros2_ws/src/...`, which only exists on the original machine, and the `cmd_vel` bridge advertised plain `geometry_msgs/msg/Twist` while `robot_controller.py` (piece 2, shared with the depth branch) publishes `TwistStamped` on that same topic name. ROS 2 topics have exactly one type, so a `TwistStamped` publisher and a `Twist` bridge on the same topic name never match each other, and no steering command from either branch would have reached `DiffDrive`. Both fixed: the path now resolves through `get_package_share_directory`, and the bridge is `TwistStamped`, matching `columns_world.launch.py`'s. The redundant second robot spawn (`ros2 run ros_gz_sim create -name waffle`, alongside the `<model name="waffle">` the world file already declares) is also gone, for the same reason `columns_world.sdf` never needed one: a world-embedded model with `<static>` unset spawns as a live, controllable entity on its own.
+
 ### 4. Run the depth model on a single image, without ROS 2 or Gazebo
 
 Everything above needs a machine that can render the simulation. `infer_image.py` is the same inference path with the ROS parts removed, so the trained model can be run on any saved camera frame, on CPU, with only `torch`, `numpy` and `Pillow` installed:
@@ -248,7 +250,35 @@ No quantitative benchmark run (timed trials, collision counts, success-rate tabl
 - **Distance estimation**: the depth branch has an explicit (if noisy, self-supervised) metric-ish depth signal per region. The YOLO branch approximates "closeness" purely from bounding-box area, which is a much cruder, non-metric signal and is sensitive to object size/pose.
 - **Failure modes observed during development**: YOLO occasionally loses track of the chair while it is partially occluded or at oblique angles (COCO's chair class was not trained on Gazebo-rendered furniture), causing it to fall back to the "searching, spin in place" behavior. The depth branch is more consistent about *something is close ahead* but, being class-agnostic, cannot distinguish an important obstacle from an unimportant one.
 
-**Stated limitation / future work:** rerun both branches for a fixed number of trials with `metrics_logger.py` enabled and commit the resulting CSV + a comparison table (success rate, mean reaction time, collision rate) instead of this qualitative summary.
+**Stated limitation:** the paragraph above is qualitative because no timed trials have been run yet. The tooling to fix that now exists, see the next section, but it needs an actual session at the keyboard to produce numbers, so [Known limitations](#known-limitations) still applies until that CSV is committed.
+
+### Running the depth-vs-YOLO comparison yourself
+
+`metrics_logger.py` turns "which branch is better" from an impression into a CSV. It is a stopwatch, not an automated benchmark: it timestamps when you tell it an obstacle appeared and when the robot's steering first moves off zero afterwards, and asks you to mark whether it collided. A human still has to watch the simulation and call the outcome, because "did the robot successfully avoid that column" is not something the topics alone can tell you.
+
+Three terminals, once the workspace is built:
+
+```bash
+scripts/run_depth_gz.sh                          # terminal 1: the simulation
+scripts/record_metrics.sh depth                  # terminal 2: press o / c / s / n / q as you watch
+```
+
+Mark `o` the moment an obstacle is clearly ahead of the robot, then `s` if it gets past without hitting it or `c` if it collides, then move to the next encounter. The arena is small and enclosed, so a single continuous run produces many encounters, no need to restart the simulation between them. 15 to 20 marked encounters is enough for the rates below to mean something; fewer than 10 and `summarize_metrics.py` will say so.
+
+Repeat for the other branch:
+
+```bash
+scripts/run_yolo.sh                               # terminal 1: swap the simulation
+scripts/record_metrics.sh yolo                     # terminal 2: same keys
+```
+
+Then turn both CSVs into the table this section is missing:
+
+```bash
+scripts/summarize_metrics.py ~/depth_metrics.csv ~/yolo_metrics.csv
+```
+
+Commit the two CSVs alongside whatever table that prints, and this section stops being qualitative.
 
 ### A train/serve mismatch that was silently degrading the depth branch
 
@@ -289,7 +319,7 @@ pip install --index-url https://download.pytorch.org/whl/cpu torch
 
 ## Known limitations
 
-- **No committed quantitative results**, see [Observations](#observations) above.
+- **No committed quantitative results yet.** The comparison in [Observations](#observations) is qualitative because no timed trials have been logged. [Running the depth-vs-YOLO comparison yourself](#running-the-depth-vs-yolo-comparison-yourself) documents the tooling; it still needs an actual session at the keyboard.
 - **The depth model only means anything inside the world it was trained in.** It is self-supervised on frames from one Gazebo world, with no labels and no external scale reference, so it has learned the geometry of *that* scene rather than depth in general. Fed ordinary photographs, every left/center/right region comes back between 0.10 m and 0.28 m against a `disp_to_depth` range of 0.1 to 20 m: it reports that everything is pressed against the lens, and the steering command that falls out of comparing three near-identical numbers is decided by noise. This is why there is no public "upload any image" demo, it would look like it worked while being meaningless. `infer_image.py` is for frames captured from `columns_world.world`.
 - **The committed checkpoint is from epoch 1.** `train_selfsup_depth.py` is written to run three epochs and overwrites `checkpoints/selfsup_depth_latest.pth` after each one, and the `epoch` field inside the committed file reads `1`. So the shipped weights are one pass over the collected frames at `lr=1e-4`, not a converged model. That is consistent with how coarse the predicted depths are, and retraining to completion is the first thing to do before quoting any numbers from this branch.
 - **Hardcoded absolute workspace paths**: `my_yolo_world/launch/tb3_custom_world.launch.py` still hardcodes its world file under `/home/mhamad/ros2_ws/src/...`, so the YOLO branch depends on `scripts/setup_workspace.sh` symlinking into that exact location. The depth branch no longer does: `columns_world.launch.py` resolves the world through `get_package_share_directory`, and `depth_node.find_checkpoint()` checks `$DEPTH_CHECKPOINT` and the package share before falling back to the old path.

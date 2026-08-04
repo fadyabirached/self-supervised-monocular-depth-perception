@@ -34,6 +34,7 @@ setup(
             'collect_selfsup = depth_project.collect_selfsup:main',
             'train_selfsup_depth = depth_project.train_selfsup_depth:main',
             'infer_image = depth_project.infer_image:main',
+            'metrics_logger = depth_project.tools.metrics_logger:main',
         ],
     },
 )
