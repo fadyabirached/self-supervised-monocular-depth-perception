@@ -1,0 +1,295 @@
+<?xml version="1.0" ?>
+<!--
+  columns_world, ported from classic Gazebo to modern gz sim (Harmonic).
+
+  The original is columns_world.world in this directory: SDF 1.6, written
+  against classic Gazebo, which reached end of life in January 2025 and has
+  no package on Ubuntu 24.04 / ROS 2 Jazzy. It cannot be launched on a
+  current install, which is why the depth branch had no runnable entry
+  point on the stack the YOLO branch already uses.
+
+  Same arena, same numbers: a 5 m x 5 m walled box and a 3 x 3 grid of
+  0.20 m columns at 1.5 m spacing, poses copied across unchanged. What
+  changed is everything classic Gazebo used to supply implicitly:
+
+    - the gz sim systems are declared explicitly (classic had them built in);
+    - lights are declared, and every visual carries a <diffuse> alongside
+      its <ambient>. Classic rendered ambient-only materials fine; gz sim
+      renders them nearly black;
+    - the ground plane is inline rather than <include>model://ground_plane,
+      which needs classic's model database;
+    - the TurtleBot3 waffle is part of the world, with its camera on /camera
+      and DiffDrive listening on /model/waffle/cmd_vel. That is the pairing
+      depth_node.py and robot_controller.py already expect. The robot block
+      is the one from my_yolo_world/worlds/yolo_world.sdf, which is known to
+      work on this simulator.
+
+  columns_world.world is kept as-is: it is what the checkpoint in
+  checkpoints/ was trained against.
+-->
+<sdf version="1.8">
+  <world name="columns_world">
+
+    <plugin filename="gz-sim-physics-system"           name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-user-commands-system"     name="gz::sim::systems::UserCommands"/>
+    <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"/>
+    <plugin filename="gz-sim-sensors-system"           name="gz::sim::systems::Sensors">
+      <!-- ogre2 is the default. On a machine with no GPU, pass the
+           render-engine flag to gz sim to fall back to ogre, the older
+           engine, which software-rasterizes far more reliably.
+           scripts/run_depth_gz.sh exposes this as RENDER_ENGINE=ogre. -->
+      <render_engine>ogre2</render_engine>
+    </plugin>
+    <plugin filename="gz-sim-imu-system"               name="gz::sim::systems::Imu"/>
+
+    <light name="sun" type="directional">
+      <pose>0 0 10 0 0 0</pose>
+      <diffuse>0.9 0.9 0.9 1</diffuse>
+      <specular>0.2 0.2 0.2 1</specular>
+      <direction>-0.5 0.1 -0.9</direction>
+      <cast_shadows>true</cast_shadows>
+    </light>
+    <light name="light_fill" type="point">
+      <pose>0 0 4 0 0 0</pose>
+      <diffuse>0.5 0.5 0.5 1</diffuse>
+      <attenuation><range>20</range><constant>0.5</constant><linear>0.01</linear><quadratic>0.001</quadratic></attenuation>
+    </light>
+
+    <model name="ground_plane">
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry><plane><normal>0 0 1</normal><size>20 20</size></plane></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><plane><normal>0 0 1</normal><size>20 20</size></plane></geometry>
+          <material><ambient>0.8 0.8 0.8 1</ambient><diffuse>0.8 0.8 0.8 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- ══════════════════════════════════════════════
+         Enclosing walls  (5 m x 5 m arena)
+         ══════════════════════════════════════════════ -->
+
+    <model name="wall_north">
+      <static>true</static><pose>0 2.5 0.5 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>5.0 0.1 1.0</size></box></geometry></collision>
+        <visual name="vis"><geometry><box><size>5.0 0.1 1.0</size></box></geometry>
+          <material><ambient>0.5 0.5 0.5 1</ambient><diffuse>0.5 0.5 0.5 1</diffuse></material></visual>
+      </link>
+    </model>
+
+    <model name="wall_south">
+      <static>true</static><pose>0 -2.5 0.5 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>5.0 0.1 1.0</size></box></geometry></collision>
+        <visual name="vis"><geometry><box><size>5.0 0.1 1.0</size></box></geometry>
+          <material><ambient>0.5 0.5 0.5 1</ambient><diffuse>0.5 0.5 0.5 1</diffuse></material></visual>
+      </link>
+    </model>
+
+    <model name="wall_east">
+      <static>true</static><pose>2.5 0 0.5 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.1 5.0 1.0</size></box></geometry></collision>
+        <visual name="vis"><geometry><box><size>0.1 5.0 1.0</size></box></geometry>
+          <material><ambient>0.5 0.5 0.5 1</ambient><diffuse>0.5 0.5 0.5 1</diffuse></material></visual>
+      </link>
+    </model>
+
+    <model name="wall_west">
+      <static>true</static><pose>-2.5 0 0.5 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.1 5.0 1.0</size></box></geometry></collision>
+        <visual name="vis"><geometry><box><size>0.1 5.0 1.0</size></box></geometry>
+          <material><ambient>0.5 0.5 0.5 1</ambient><diffuse>0.5 0.5 0.5 1</diffuse></material></visual>
+      </link>
+    </model>
+
+    <!-- ══════════════════════════════════════════════
+         9 column obstacles in a 3 x 3 grid
+         0.20 m diameter, 0.80 m tall, 1.5 m apart
+         ══════════════════════════════════════════════ -->
+
+    <model name="col_1_1">
+      <static>true</static><pose>-1.5 -1.5 0.4 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><cylinder><radius>0.10</radius><length>0.80</length></cylinder></geometry></collision>
+        <visual name="vis"><geometry><cylinder><radius>0.10</radius><length>0.80</length></cylinder></geometry>
+          <material><ambient>0.2 0.2 0.8 1</ambient><diffuse>0.2 0.2 0.8 1</diffuse></material></visual>
+      </link>
+    </model>
+    <model name="col_1_2">
+      <static>true</static><pose>0.0 -1.5 0.4 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><cylinder><radius>0.10</radius><length>0.80</length></cylinder></geometry></collision>
+        <visual name="vis"><geometry><cylinder><radius>0.10</radius><length>0.80</length></cylinder></geometry>
+          <material><ambient>0.2 0.2 0.8 1</ambient><diffuse>0.2 0.2 0.8 1</diffuse></material></visual>
+      </link>
+    </model>
+    <model name="col_1_3">
+      <static>true</static><pose>1.5 -1.5 0.4 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><cylinder><radius>0.10</radius><length>0.80</length></cylinder></geometry></collision>
+        <visual name="vis"><geometry><cylinder><radius>0.10</radius><length>0.80</length></cylinder></geometry>
+          <material><ambient>0.2 0.2 0.8 1</ambient><diffuse>0.2 0.2 0.8 1</diffuse></material></visual>
+      </link>
+    </model>
+    <model name="col_2_1">
+      <static>true</static><pose>-1.5 0.0 0.4 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><cylinder><radius>0.10</radius><length>0.80</length></cylinder></geometry></collision>
+        <visual name="vis"><geometry><cylinder><radius>0.10</radius><length>0.80</length></cylinder></geometry>
+          <material><ambient>0.2 0.2 0.8 1</ambient><diffuse>0.2 0.2 0.8 1</diffuse></material></visual>
+      </link>
+    </model>
+    <model name="col_2_2">
+      <static>true</static><pose>0.0 0.0 0.4 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><cylinder><radius>0.10</radius><length>0.80</length></cylinder></geometry></collision>
+        <visual name="vis"><geometry><cylinder><radius>0.10</radius><length>0.80</length></cylinder></geometry>
+          <material><ambient>0.2 0.2 0.8 1</ambient><diffuse>0.2 0.2 0.8 1</diffuse></material></visual>
+      </link>
+    </model>
+    <model name="col_2_3">
+      <static>true</static><pose>1.5 0.0 0.4 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><cylinder><radius>0.10</radius><length>0.80</length></cylinder></geometry></collision>
+        <visual name="vis"><geometry><cylinder><radius>0.10</radius><length>0.80</length></cylinder></geometry>
+          <material><ambient>0.2 0.2 0.8 1</ambient><diffuse>0.2 0.2 0.8 1</diffuse></material></visual>
+      </link>
+    </model>
+    <model name="col_3_1">
+      <static>true</static><pose>-1.5 1.5 0.4 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><cylinder><radius>0.10</radius><length>0.80</length></cylinder></geometry></collision>
+        <visual name="vis"><geometry><cylinder><radius>0.10</radius><length>0.80</length></cylinder></geometry>
+          <material><ambient>0.2 0.2 0.8 1</ambient><diffuse>0.2 0.2 0.8 1</diffuse></material></visual>
+      </link>
+    </model>
+    <model name="col_3_2">
+      <static>true</static><pose>0.0 1.5 0.4 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><cylinder><radius>0.10</radius><length>0.80</length></cylinder></geometry></collision>
+        <visual name="vis"><geometry><cylinder><radius>0.10</radius><length>0.80</length></cylinder></geometry>
+          <material><ambient>0.2 0.2 0.8 1</ambient><diffuse>0.2 0.2 0.8 1</diffuse></material></visual>
+      </link>
+    </model>
+    <model name="col_3_3">
+      <static>true</static><pose>1.5 1.5 0.4 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><cylinder><radius>0.10</radius><length>0.80</length></cylinder></geometry></collision>
+        <visual name="vis"><geometry><cylinder><radius>0.10</radius><length>0.80</length></cylinder></geometry>
+          <material><ambient>0.2 0.2 0.8 1</ambient><diffuse>0.2 0.2 0.8 1</diffuse></material></visual>
+      </link>
+    </model>
+
+    <!-- ══════════════════════════════════════════════
+         TurtleBot3 waffle, spawned at the arena's south-west corner
+         (the x/y the classic launch file used), facing +x.
+         Camera publishes on /camera; DiffDrive listens on
+         /model/waffle/cmd_vel.
+         ══════════════════════════════════════════════ -->
+
+    <model name="waffle">
+      <pose>-2.0 -2.0 0.01 0 0 0</pose>
+
+      <link name="base_footprint"/>
+
+      <joint name="base_joint" type="fixed">
+        <parent>base_footprint</parent>
+        <child>base_link</child>
+        <pose>0 0 0.010 0 0 0</pose>
+      </joint>
+
+      <link name="base_link">
+        <inertial>
+          <mass>1.3729096</mass>
+          <inertia><ixx>8.7002e-3</ixx><ixy>-4.24e-5</ixy><ixz>1.4546e-5</ixz>
+                   <iyy>1.0940e-2</iyy><iyz>-2.834e-7</iyz><izz>1.2836e-2</izz></inertia>
+        </inertial>
+        <collision name="base_collision">
+          <pose>-0.064 0 0.047 0 0 0</pose>
+          <geometry><box><size>0.266 0.266 0.094</size></box></geometry>
+        </collision>
+        <visual name="base_visual">
+          <pose>-0.064 0 0 0 0 0</pose>
+          <geometry><box><size>0.266 0.266 0.094</size></box></geometry>
+          <material><ambient>0.0 0.0 0.8 1</ambient><diffuse>0.0 0.0 0.8 1</diffuse></material>
+        </visual>
+      </link>
+
+      <joint name="wheel_left_joint" type="revolute">
+        <parent>base_link</parent><child>wheel_left_link</child>
+        <pose>0 0.144 0.023 -1.5707963 0 0</pose>
+        <axis><xyz>0 0 1</xyz><limit><lower>-1e16</lower><upper>1e16</upper></limit></axis>
+      </joint>
+      <link name="wheel_left_link">
+        <pose>0 0.144 0.023 -1.5707963 0 0</pose>
+        <inertial><mass>0.1</mass><inertia><ixx>1.1175e-5</ixx><ixy>0</ixy><ixz>0</ixz><iyy>1.1175e-5</iyy><iyz>0</iyz><izz>2.0250e-5</izz></inertia></inertial>
+        <collision name="col"><geometry><cylinder><radius>0.033</radius><length>0.018</length></cylinder></geometry></collision>
+        <visual name="vis"><geometry><cylinder><radius>0.033</radius><length>0.018</length></cylinder></geometry>
+          <material><ambient>0.1 0.1 0.1 1</ambient><diffuse>0.1 0.1 0.1 1</diffuse></material></visual>
+      </link>
+
+      <joint name="wheel_right_joint" type="revolute">
+        <parent>base_link</parent><child>wheel_right_link</child>
+        <pose>0 -0.144 0.023 -1.5707963 0 0</pose>
+        <axis><xyz>0 0 1</xyz><limit><lower>-1e16</lower><upper>1e16</upper></limit></axis>
+      </joint>
+      <link name="wheel_right_link">
+        <pose>0 -0.144 0.023 -1.5707963 0 0</pose>
+        <inertial><mass>0.1</mass><inertia><ixx>1.1175e-5</ixx><ixy>0</ixy><ixz>0</ixz><iyy>1.1175e-5</iyy><iyz>0</iyz><izz>2.0250e-5</izz></inertia></inertial>
+        <collision name="col"><geometry><cylinder><radius>0.033</radius><length>0.018</length></cylinder></geometry></collision>
+        <visual name="vis"><geometry><cylinder><radius>0.033</radius><length>0.018</length></cylinder></geometry>
+          <material><ambient>0.1 0.1 0.1 1</ambient><diffuse>0.1 0.1 0.1 1</diffuse></material></visual>
+      </link>
+
+      <joint name="caster_front_joint" type="ball">
+        <parent>base_link</parent><child>caster_front_link</child>
+      </joint>
+      <link name="caster_front_link">
+        <pose>0.177 0 0.023 0 0 0</pose>
+        <inertial><mass>0.001</mass><inertia><ixx>1e-9</ixx><ixy>0</ixy><ixz>0</ixz><iyy>1e-9</iyy><iyz>0</iyz><izz>1e-9</izz></inertia></inertial>
+        <collision name="col"><geometry><sphere><radius>0.005</radius></sphere></geometry>
+          <surface><friction><ode><mu>0</mu><mu2>0</mu2></ode></friction></surface></collision>
+      </link>
+
+      <joint name="camera_joint" type="fixed">
+        <parent>base_link</parent><child>camera_link</child>
+        <pose>0.064 -0.065 0.094 0 0 0</pose>
+      </joint>
+      <link name="camera_link">
+        <pose>0.064 -0.065 0.094 0 0 0</pose>
+        <inertial><mass>0.001</mass><inertia><ixx>1e-9</ixx><ixy>0</ixy><ixz>0</ixz><iyy>1e-9</iyy><iyz>0</iyz><izz>1e-9</izz></inertia></inertial>
+        <sensor name="camera" type="camera">
+          <always_on>1</always_on>
+          <update_rate>15</update_rate>
+          <camera>
+            <horizontal_fov>1.3962634</horizontal_fov>
+            <image><width>640</width><height>480</height><format>R8G8B8</format></image>
+            <clip><near>0.02</near><far>300</far></clip>
+          </camera>
+          <topic>/camera</topic>
+        </sensor>
+      </link>
+
+      <plugin filename="gz-sim-diff-drive-system" name="gz::sim::systems::DiffDrive">
+        <left_joint>wheel_left_joint</left_joint>
+        <right_joint>wheel_right_joint</right_joint>
+        <wheel_separation>0.287</wheel_separation>
+        <wheel_radius>0.033</wheel_radius>
+        <max_linear_velocity>0.26</max_linear_velocity>
+        <max_angular_velocity>1.82</max_angular_velocity>
+        <topic>/model/waffle/cmd_vel</topic>
+        <odom_topic>/model/waffle/odometry</odom_topic>
+        <frame_id>odom</frame_id>
+        <child_frame_id>base_footprint</child_frame_id>
+      </plugin>
+
+    </model>
+
+  </world>
+</sdf>

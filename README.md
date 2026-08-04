@@ -11,6 +11,7 @@ Comparing two perception approaches for robot obstacle avoidance in a ROS 2 / Ga
 - [Project logic](#project-logic)
 - [Repository structure](#repository-structure)
 - [Environment](#environment)
+- [Run it in a browser, with no local install](#run-it-in-a-browser-with-no-local-install)
 - [Running the project](#running-the-project)
 - [Observations](#observations)
 - [Tests and CI](#tests-and-ci)
@@ -92,8 +93,10 @@ depth_project/depth_project/      # self-supervised depth branch
 │   ├── save_images.py            # YOLO training-data capture
 │   └── tools/metrics_logger.py   # optional run-by-run CSV metrics logger
 ├── checkpoints/selfsup_depth_latest.pth
-├── launch/gazebo.launch.py       # full depth-branch launch (classic Gazebo)
-└── worlds/columns_world.world
+├── launch/gazebo.launch.py           # original launch (classic Gazebo, EOL)
+├── launch/columns_world.launch.py    # current launch (gz sim / Harmonic)
+├── worlds/columns_world.world        # original arena (SDF 1.6, classic)
+└── worlds/columns_world.sdf          # same arena + robot, ported to gz sim
 
 my_yolo_world/my_yolo_world/      # custom Gazebo world + world-only launch
 ├── launch/tb3_custom_world.launch.py
@@ -106,7 +109,8 @@ yolo_nav/yolo_nav/                # YOLO branch nodes
     └── steering_logic.py         # pure-Python detection / steering math (tested)
 
 tests/                            # pytest unit tests: pure logic above + the trained checkpoint
-scripts/                          # setup + run scripts (see below)
+scripts/                          # setup, run and screen-recording scripts (see below)
+.devcontainer/                    # ROS 2 + Gazebo container with a browser desktop
 .github/workflows/ci.yml          # lint + unit tests
 ```
 
@@ -142,6 +146,26 @@ pip install -r requirements.txt
 
 ---
 
+## Run it in a browser, with no local install
+
+Standing up ROS 2, Gazebo and TurtleBot3 to look at this project is most of a day's work, and it needs a machine that can render a simulation. `.devcontainer/` removes both requirements: it builds a container with the whole stack preinstalled, runs Gazebo on a virtual X display, and serves that display over noVNC, so the simulation arrives in a browser tab.
+
+Open the repository in **GitHub Codespaces** (Code -> Codespaces -> Create codespace). The container builds, the workspace is linked and compiled by `.devcontainer/post-create.sh`, and the desktop comes up on port 6080. Then:
+
+```bash
+scripts/run_depth_gz.sh          # Gazebo + depth model + steering
+scripts/record_sim.sh demo.gif   # capture 20 s of it as a GIF
+```
+
+Open the forwarded port 6080 (add `/vnc.html` if the browser does not land in the client directly) and the Gazebo window is there, alongside the node's own RGB-next-to-depth window.
+
+Two things worth knowing before you try it:
+
+- **There is no GPU.** Rendering goes through Mesa's `llvmpipe` software rasterizer. This world is four walls, nine cylinders and one robot, which is small enough to work, but expect single-digit frames per second. If Gazebo fails to start at all, `RENDER_ENGINE=ogre scripts/run_depth_gz.sh` falls back to the older render engine, which software-rasterizes more reliably than the default `ogre2`.
+- **This runs on a stack the original launch file could not.** `gazebo.launch.py` targets classic Gazebo, which reached end of life in January 2025 and has no package on Ubuntu 24.04 / ROS 2 Jazzy. `columns_world.launch.py` and `worlds/columns_world.sdf` are the same arena ported to `gz sim` (Gazebo Harmonic), which is what Jazzy ships and what the YOLO branch was already using. Same wall and column poses, with the lights, materials and simulator plugins classic used to supply implicitly. See [Running the project](#running-the-project) for both entry points.
+
+---
+
 ## Running the project
 
 ### 1. Build the workspace
@@ -166,10 +190,17 @@ source install/setup.bash
 ### 2. Run the self-supervised depth branch
 
 ```bash
-scripts/run_depth.sh
+scripts/run_depth_gz.sh          # gz sim / Gazebo Harmonic, the current stack
+scripts/run_depth.sh             # classic Gazebo, the original
 ```
 
-This is exactly `ros2 launch depth_project gazebo.launch.py`: it starts classic Gazebo with `columns_world.world` and a burger TurtleBot3, then `depth_node` (5s later) and `robot_controller` (6s later) once the simulation has settled. `depth_node` loads the checkpoint at `~/ros2_ws/src/depth_project/checkpoints/selfsup_depth_latest.pth`, the repo ships one at `depth_project/depth_project/checkpoints/selfsup_depth_latest.pth`, which the symlink from step 1 already exposes at that path.
+Two entry points, because the simulator changed underneath the project.
+
+`run_depth_gz.sh` launches `columns_world.launch.py`: `gz sim` with `worlds/columns_world.sdf`, then the `ros_gz` bridges (5s and 6s), then `depth_node` and `robot_controller` (10s and 11s) once camera frames are actually flowing. The world file carries the arena *and* the TurtleBot3 waffle with its camera on `/camera` and DiffDrive on `/model/waffle/cmd_vel`, which is the pairing the two nodes already expect. Paths resolve through `get_package_share_directory`, so it runs from any workspace. Useful arguments: `HEADLESS=true` for no Gazebo window, `RENDER_ENGINE=ogre` on a machine with no GPU.
+
+`run_depth.sh` is the original: `ros2 launch depth_project gazebo.launch.py`, classic Gazebo with `columns_world.world` and a burger TurtleBot3. Kept because it is what the committed checkpoint was trained against, but classic Gazebo is end-of-life and has no Ubuntu 24.04 package, so this will not run on a current install.
+
+Either way `depth_node` finds the checkpoint by looking at `$DEPTH_CHECKPOINT`, then the installed package share, then the legacy `~/ros2_ws/src/depth_project/checkpoints/` path. The repo ships one at `depth_project/depth_project/checkpoints/selfsup_depth_latest.pth`, which step 1 exposes at all of them.
 
 ### 3. Run the YOLO branch
 
@@ -261,7 +292,7 @@ pip install --index-url https://download.pytorch.org/whl/cpu torch
 - **No committed quantitative results**, see [Observations](#observations) above.
 - **The depth model only means anything inside the world it was trained in.** It is self-supervised on frames from one Gazebo world, with no labels and no external scale reference, so it has learned the geometry of *that* scene rather than depth in general. Fed ordinary photographs, every left/center/right region comes back between 0.10 m and 0.28 m against a `disp_to_depth` range of 0.1 to 20 m: it reports that everything is pressed against the lens, and the steering command that falls out of comparing three near-identical numbers is decided by noise. This is why there is no public "upload any image" demo, it would look like it worked while being meaningless. `infer_image.py` is for frames captured from `columns_world.world`.
 - **The committed checkpoint is from epoch 1.** `train_selfsup_depth.py` is written to run three epochs and overwrites `checkpoints/selfsup_depth_latest.pth` after each one, and the `epoch` field inside the committed file reads `1`. So the shipped weights are one pass over the collected frames at `lr=1e-4`, not a converged model. That is consistent with how coarse the predicted depths are, and retraining to completion is the first thing to do before quoting any numbers from this branch.
-- **Hardcoded absolute workspace paths**: `my_yolo_world/launch/tb3_custom_world.launch.py` and `depth_project/depth_project/depth_node.py` hardcode paths under `~/ros2_ws/src/...` rather than resolving them via `get_package_share_directory`/parameters. `scripts/setup_workspace.sh` and `scripts/run_*.sh` work around this by symlinking into that exact location.
+- **Hardcoded absolute workspace paths**: `my_yolo_world/launch/tb3_custom_world.launch.py` still hardcodes its world file under `/home/mhamad/ros2_ws/src/...`, so the YOLO branch depends on `scripts/setup_workspace.sh` symlinking into that exact location. The depth branch no longer does: `columns_world.launch.py` resolves the world through `get_package_share_directory`, and `depth_node.find_checkpoint()` checks `$DEPTH_CHECKPOINT` and the package share before falling back to the old path.
 - **`depth_project/launch/custom_world_waffle.launch.py`** duplicates `my_yolo_world/launch/tb3_custom_world.launch.py` (same hardcoded world path, `ExecuteProcess`-based instead of `IncludeLaunchDescription`-based). It isn't used by either run script and looks like an earlier iteration left in place; kept for history rather than deleted.
 - **`depth_project/depth_project/yolo_controller.py`** imports a `yolo_msgs` package that isn't declared as a dependency anywhere and isn't registered as a console script in `setup.py`, it's dead/experimental code, not part of either working pipeline.
 - **Possible `cmd_vel` topic mismatch on the depth branch**: `robot_controller.py` hardcodes its output topic as `/model/waffle/cmd_vel`, which is the `gz sim` bridge naming pattern created explicitly by `my_yolo_world/launch/tb3_custom_world.launch.py` for the YOLO branch. The depth branch's `gazebo.launch.py` runs a **burger** robot in **classic Gazebo** via `turtlebot3_gazebo`'s own launch file, which does not set up that same bridge/topic, classic TurtleBot3 Gazebo launches typically expose an unnamespaced `/cmd_vel`. This documentation pass read the code but did not run a live simulation to confirm the robot actually moves end-to-end on the depth branch; if `scripts/run_depth.sh` produces steering output but no robot motion, this topic name is the first thing to check.

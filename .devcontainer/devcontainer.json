@@ -1,0 +1,38 @@
+{
+  "name": "ROS 2 Jazzy + Gazebo (browser desktop)",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": "."
+  },
+
+  // Gazebo's physics and the software rasterizer both want headroom.
+  // A 2-core machine works; 4 cores is noticeably smoother.
+  "hostRequirements": {
+    "cpus": 4,
+    "memory": "8gb",
+    "storage": "32gb"
+  },
+
+  "containerEnv": {
+    "DISPLAY": ":1",
+    "LIBGL_ALWAYS_SOFTWARE": "1",
+    "TURTLEBOT3_MODEL": "waffle"
+  },
+
+  "forwardPorts": [6080],
+  "portsAttributes": {
+    "6080": {
+      "label": "Gazebo desktop (noVNC)",
+      "onAutoForward": "notify"
+    }
+  },
+
+  // Links the three colcon packages into ~/ros2_ws and builds them.
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
+
+  // Xvfb, the window manager and noVNC, brought up on every attach so the
+  // browser desktop is there without having to remember a command.
+  "postStartCommand": "nohup start-desktop > /tmp/start-desktop.log 2>&1 &",
+
+  "remoteUser": "root"
+}

@@ -13,6 +13,42 @@ from depth_project.losses import disp_to_depth
 from depth_project.steering_logic import split_regions, percentile_of_valid, median_filter, choose_steering
 
 
+def find_checkpoint():
+    """Locate the trained weights without assuming a workspace layout.
+
+    This used to be a single hardcoded ~/ros2_ws/src path, which is one of
+    the absolute-path assumptions listed in the README's known limitations
+    and the reason the node could not start from a container or from any
+    workspace not at that exact location. Checked in order: an explicit
+    override, the installed package share, then the legacy path so an
+    existing ~/ros2_ws setup keeps working unchanged.
+    """
+    candidates = []
+
+    override = os.environ.get('DEPTH_CHECKPOINT')
+    if override:
+        candidates.append(os.path.expanduser(override))
+
+    try:
+        from ament_index_python.packages import get_package_share_directory
+        candidates.append(os.path.join(
+            get_package_share_directory('depth_project'),
+            'checkpoints', 'selfsup_depth_latest.pth'))
+    except Exception:  # package not installed, e.g. running from source
+        pass
+
+    candidates.append(os.path.expanduser(
+        '~/ros2_ws/src/depth_project/checkpoints/selfsup_depth_latest.pth'))
+
+    for path in candidates:
+        if os.path.exists(path):
+            return path
+
+    raise FileNotFoundError(
+        'checkpoint not found, looked in:\n  ' + '\n  '.join(candidates)
+        + '\nSet DEPTH_CHECKPOINT to point at selfsup_depth_latest.pth.')
+
+
 class DepthNode(Node):
     def __init__(self):
         super().__init__('depth_node')
@@ -20,9 +56,12 @@ class DepthNode(Node):
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.model = DepthNet().to(self.device)
 
-        ckpt = os.path.expanduser('~/ros2_ws/src/depth_project/checkpoints/selfsup_depth_latest.pth')
-        if not os.path.exists(ckpt):
-            raise FileNotFoundError(f'checkpoint not found: {ckpt}')
+        # No display means no cv2.imshow: the node runs headless (in a
+        # container, or on a server) and just publishes /steering_cmd.
+        self.show_window = bool(os.environ.get('DISPLAY'))
+
+        ckpt = find_checkpoint()
+        self.get_logger().info(f'Loading checkpoint: {ckpt}')
 
         data = torch.load(ckpt, map_location=self.device)
         self.model.load_state_dict(data['depth_net'])
@@ -59,9 +98,6 @@ class DepthNode(Node):
             disp, _ = self.model(img)
             depth = disp_to_depth(disp).squeeze().cpu().numpy()
 
-        depth_vis = cv2.normalize(depth, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
-        depth_vis = cv2.applyColorMap(depth_vis, cv2.COLORMAP_MAGMA)
-
         L_roi, C_roi, R_roi = split_regions(depth)
 
         L = median_filter(self._L, percentile_of_valid(L_roi, 35), self._N)
@@ -73,6 +109,12 @@ class DepthNode(Node):
         out = Float32()
         out.data = float(np.clip(steering, -1.0, 1.0))
         self.pub.publish(out)
+
+        if not self.show_window:
+            return
+
+        depth_vis = cv2.normalize(depth, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
+        depth_vis = cv2.applyColorMap(depth_vis, cv2.COLORMAP_MAGMA)
 
         bgr_vis = cv2.cvtColor(cv2.resize(frame, (320, 192)), cv2.COLOR_RGB2BGR)
         combined = np.hstack((bgr_vis, depth_vis))
